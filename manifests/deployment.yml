@@ -1,0 +1,16 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: "rbk8s-13b4"
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: "rbk8s-13b4"
+    spec:
+      containers:
+        - name: "rbk8s-13b4"
+          image: "rachitbacr.azurecr.io/rbk8s"
+          ports:
+          - containerPort: 3000
