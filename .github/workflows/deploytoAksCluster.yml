@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: rachitbacr.azurecr.io
+        username: ${{ secrets.acr_rachitbacr_username }}
+        password: ${{ secrets.acr_rachitbacr_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/" -f  "Dockerfile" -t rachitbacr.azurecr.io/rbk8s:${{ github.sha }}
+        docker push rachitbacr.azurecr.io/rbk8s:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_rbk8s_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep rbk8s75ad | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace rbk8s75ad`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: rbk8s75ad
+        container-registry-url: rachitbacr.azurecr.io
+        container-registry-username: ${{ secrets.acr_rachitbacr_username }}
+        container-registry-password: ${{ secrets.acr_rachitbacr_password }}
+        secret-name: rbk8sdockerauth
+       
+    - uses: azure/k8s-deploy@v1
+      with:
+        namespace: rbk8s75ad
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          rachitbacr.azurecr.io/rbk8s:${{ github.sha }}
+        imagepullsecrets: |
+          rbk8sdockerauth
